@@ -1,0 +1,17 @@
+target/
+**/target/
+.m2/
+.idea/
+.vscode/
+*.iml
+*.log
+.DS_Store
+.env
+application-local.yml
+application-local.yaml
+application-local.properties
+# Exclude project documentation and local artifacts
+# (these are not part of the source repo)
+doc/
+springAI.zip
+.codex_tmp/

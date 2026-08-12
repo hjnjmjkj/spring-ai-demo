@@ -1,0 +1,49 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: qwen-agent-web
+  datasource:
+    url: jdbc:postgresql://${PGVECTOR_HOST:localhost}:${PGVECTOR_PORT:5555}/${POSTGRES_DB:pgvector}
+    username: ${POSTGRES_USER:pgvector}
+    password: ${POSTGRES_PASSWORD:pgvector}
+  ai:
+    model:
+      chat: openai
+      embedding: openai
+    openai:
+      api-key: ${DASHSCOPE_API_KEY:sk-ws-H.ERXERRI.X6IN.MEQCIBFwjJo_-iphKj4Jv2_gbR4doKN-btXB8UI2L9S2nYJMAiAxwGg2nybaLpCOE88SjyE_Q2QGKd0g9wozUODCe-Ev9Q}
+      base-url: ${QWEN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+      chat:
+        model: ${QWEN_MODEL:qwen3.7-plus}
+        temperature: 0.2
+      embedding:
+        model: ${QWEN_EMBEDDING_MODEL:text-embedding-v4}
+        dimensions: ${QWEN_EMBEDDING_DIMENSIONS:1024}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: ${QWEN_EMBEDDING_DIMENSIONS:1024}
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        schema-name: public
+        table-name: vector_store
+    mcp:
+      client:
+        name: qwen-agent-mcp-client
+        version: 1.0.0
+        type: SYNC
+        initialized: true
+        request-timeout: 30s
+        toolcallback:
+          enabled: true
+        streamable-http:
+          connections:
+            calculator:
+              url: ${MCP_SERVER_URL:http://localhost:8081}
+              endpoint: /mcp
+
+logging:
+  level:
+    org.springframework.ai.mcp: INFO

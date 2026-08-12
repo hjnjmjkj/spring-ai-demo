@@ -1,0 +1,25 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: sggis-mcp-server
+  ai:
+    mcp:
+      server:
+        protocol: STATELESS
+        name: sggis-mcp-server
+        version: 1.0.0
+        type: SYNC
+        instructions: "提供精确计算、电源追溯、线路配变查询，以及地址地理编码和周边电网设备查询工具。电源追溯和地址周边查询必须按规定顺序调用。"
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
+        streamable-http:
+          mcp-endpoint: /mcp
+
+logging:
+  level:
+    org.springframework.ai.mcp: INFO

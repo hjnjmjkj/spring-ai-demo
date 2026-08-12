@@ -1,0 +1,26 @@
+spring:
+  config:
+    activate:
+      on-profile: intranet
+  ai:
+    openai:
+      chat:
+        base-url: ${INTRANET_LLM_BASE_URL:http://27.196.211.151:19090/v1}
+        api-key: ${INTRANET_LLM_API_KEY:EMPTY}
+        model: ${INTRANET_LLM_MODEL:Qwen}
+        temperature: 0.2
+        timeout: 120s
+      # Keep embeddings on the intranet as well so RAG content is never sent outside.
+      embedding:
+        base-url: ${INTRANET_EMBEDDING_BASE_URL}
+        api-key: ${INTRANET_EMBEDDING_API_KEY:EMPTY}
+        model: ${INTRANET_EMBEDDING_MODEL}
+        dimensions: ${INTRANET_EMBEDDING_DIMENSIONS}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: ${INTRANET_EMBEDDING_DIMENSIONS}
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        schema-name: public
+        table-name: vector_store

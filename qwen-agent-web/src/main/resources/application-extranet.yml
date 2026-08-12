@@ -1,0 +1,24 @@
+spring:
+  config:
+    activate:
+      on-profile: extranet
+  ai:
+    openai:
+      chat:
+        base-url: ${QWEN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+        api-key: ${DASHSCOPE_API_KEY}
+        model: ${QWEN_MODEL:qwen3.7-plus}
+        temperature: 0.2
+      embedding:
+        base-url: ${QWEN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+        api-key: ${DASHSCOPE_API_KEY}
+        model: ${QWEN_EMBEDDING_MODEL:text-embedding-v4}
+        dimensions: ${QWEN_EMBEDDING_DIMENSIONS:1024}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: ${QWEN_EMBEDDING_DIMENSIONS:1024}
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        schema-name: public
+        table-name: vector_store

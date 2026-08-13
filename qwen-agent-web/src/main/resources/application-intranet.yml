@@ -3,13 +3,17 @@ spring:
     activate:
       on-profile: intranet
   ai:
+    model:
+      audio:
+        speech: none
     openai:
+      base-url: ${INTRANET_LLM_BASE_URL:http://27.196.211.151:19090/v1}
+      api-key: ${INTRANET_LLM_API_KEY:EMPTY}
+      timeout: 120s
       chat:
-        base-url: ${INTRANET_LLM_BASE_URL:http://27.196.211.151:19090/v1}
-        api-key: ${INTRANET_LLM_API_KEY:EMPTY}
-        model: ${INTRANET_LLM_MODEL:Qwen}
-        temperature: 0.2
-        timeout: 120s
+        options:
+          model: ${INTRANET_LLM_MODEL:Qwen}
+          temperature: 0.2
       # Keep embeddings on the intranet as well so RAG content is never sent outside.
       embedding:
         base-url: ${INTRANET_EMBEDDING_BASE_URL}

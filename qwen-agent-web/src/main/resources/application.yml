@@ -14,6 +14,11 @@ spring:
     model:
       chat: openai
       embedding: openai
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
     mcp:
       client:
         name: qwen-agent-mcp-client
@@ -32,3 +37,4 @@ spring:
 logging:
   level:
     org.springframework.ai.mcp: INFO
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: DEBUG

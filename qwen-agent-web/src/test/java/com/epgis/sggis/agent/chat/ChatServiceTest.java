@@ -15,29 +15,30 @@ class ChatServiceTest {
         AtomicReference<String> arguments = new AtomicReference<>();
         AgentClient client = new StubAgentClient() {
             @Override
-            public String call(String conversationId, String message) {
+            public AgentReply call(String conversationId, String message) {
                 arguments.set(conversationId + ":" + message);
-                return "回答";
+                return new AgentReply("回答", null);
             }
         };
 
         ChatService service = new ChatService(client);
 
-        assertThat(service.chat("conversation-1", "你好")).isEqualTo("回答");
+        assertThat(service.chat("conversation-1", "你好").content()).isEqualTo("回答");
         assertThat(arguments).hasValue("conversation-1:你好");
     }
 
     @Test
-    void streamsAllFragments() {
+    void streamsAllReplies() {
         AgentClient client = new StubAgentClient() {
             @Override
-            public Flux<String> stream(String conversationId, String message) {
-                return Flux.just("你", "好");
+            public Flux<AgentReply> stream(String conversationId, String message) {
+                return Flux.just(new AgentReply("你", null), new AgentReply("好", null));
             }
         };
 
         StepVerifier.create(new ChatService(client).stream("conversation-1", "你好"))
-                .expectNext("你", "好")
+                .expectNextMatches(reply -> "你".equals(reply.content()))
+                .expectNextMatches(reply -> "好".equals(reply.content()))
                 .verifyComplete();
     }
 
@@ -45,7 +46,7 @@ class ChatServiceTest {
     void convertsProviderFailureToSafeException() {
         AgentClient client = new StubAgentClient() {
             @Override
-            public String call(String conversationId, String message) {
+            public AgentReply call(String conversationId, String message) {
                 throw new IllegalStateException("secret provider details");
             }
         };
@@ -58,12 +59,12 @@ class ChatServiceTest {
 
     private static class StubAgentClient implements AgentClient {
         @Override
-        public String call(String conversationId, String message) {
-            return "";
+        public AgentReply call(String conversationId, String message) {
+            return new AgentReply("", null);
         }
 
         @Override
-        public Flux<String> stream(String conversationId, String message) {
+        public Flux<AgentReply> stream(String conversationId, String message) {
             return Flux.empty();
         }
     }

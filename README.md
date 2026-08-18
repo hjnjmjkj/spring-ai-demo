@@ -148,6 +148,27 @@ curl -X POST http://localhost:8080/api/chat \
   -d '{"conversationId":"7f3ad908-937f-4d5f-b4d1-fd5aef7d44a1","message":"产品 A 保修多久？"}'
 ```
 
+同步响应同时包含模型文字和本轮所有 MCP 工具调用的结构化结果：
+
+```json
+{
+  "conversationId": "7f3ad908-937f-4d5f-b4d1-fd5aef7d44a1",
+  "content": "已找到目标设备。",
+  "toolResults": [
+    {
+      "toolName": "searchPowerEquipment",
+      "arguments": { "keyword": "436289" },
+      "result": {
+        "searchId": "...",
+        "candidates": []
+      }
+    }
+  ]
+}
+```
+
+没有调用 MCP 工具时，`toolResults` 为空数组。工具返回合法 JSON 时，`arguments` 和 `result` 保持对象、数组、数字和布尔值等原始 JSON 类型；非 JSON 返回值按字符串传递。
+
 SSE 调用：
 
 ```bash
@@ -158,6 +179,150 @@ curl -N -X POST http://localhost:8080/api/chat/stream \
 ```
 
 为规避 Spring AI 2.0.0 合并部分 Qwen 工具调用流式分片时的兼容问题，SSE 接口内部使用同步模型调用，并将完整回答作为一个 `token` 事件返回，因此页面会一次性显示答案。
+
+SSE 按以下顺序返回事件：每次 MCP 调用对应一个 `tool` 事件，其 `data` 就是上例中的单条工具结果；随后通过 `token` 返回 `{"content":"..."}`，最后通过 `done` 表示结束。错误仍通过 `error` 事件返回。
+
+### 前端调用示例
+
+前端应为同一段连续对话复用同一个 UUID；新建会话时再生成新的 UUID：
+
+```javascript
+function getConversationId() {
+  let id = localStorage.getItem('conversationId');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('conversationId', id);
+  }
+  return id;
+}
+```
+
+普通 JSON 调用：
+
+```javascript
+async function chat(message) {
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      conversationId: getConversationId(),
+      message
+    })
+  });
+
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.message || '对话请求失败');
+  }
+
+  // 显示模型生成的文字。
+  document.querySelector('#answer').textContent = body.content;
+
+  // 一次 Agent 调用可能执行多个 MCP 工具。
+  body.toolResults.forEach(handleToolResult);
+  return body;
+}
+```
+
+可以根据 `toolName` 将 MCP 结果交给不同的业务组件。工具名启用 MCP 前缀时仍可使用 `endsWith` 匹配原始名称：
+
+```javascript
+function handleToolResult(tool) {
+  if (tool.toolName.endsWith('searchPowerEquipment')) {
+    renderEquipmentCandidates(tool.result.candidates || []);
+    return;
+  }
+  if (tool.toolName.endsWith('tracePowerSource')) {
+    renderPowerPath(tool.result.paths || []);
+    return;
+  }
+  if (tool.toolName.endsWith('queryPowerEquipmentDetails')) {
+    renderPowerDetails(tool.result.paths || []);
+    return;
+  }
+
+  // 未单独适配的工具先按 JSON 展示，便于调试和向后兼容。
+  document.querySelector('#tool-json').textContent =
+    JSON.stringify(tool, null, 2);
+}
+```
+
+SSE 接口是 `POST` 请求，浏览器原生 `EventSource` 不能携带该请求体，因此使用 `fetch` 读取响应流：
+
+```javascript
+async function streamChat(message, handlers = {}) {
+  const response = await fetch('/api/chat/stream', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream'
+    },
+    body: JSON.stringify({
+      conversationId: getConversationId(),
+      message
+    })
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message || '流式对话请求失败');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+    const frames = buffer.split(/\r?\n\r?\n/);
+    buffer = frames.pop() || '';
+    frames.forEach(frame => handleSseFrame(frame, handlers));
+
+    if (done) {
+      if (buffer.trim()) handleSseFrame(buffer, handlers);
+      break;
+    }
+  }
+}
+
+function handleSseFrame(frame, handlers) {
+  let eventName = 'message';
+  const dataLines = [];
+
+  frame.split(/\r?\n/).forEach(line => {
+    if (line.startsWith('event:')) {
+      eventName = line.slice(6).trim();
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trimStart());
+    }
+  });
+
+  if (!dataLines.length) return;
+  const data = JSON.parse(dataLines.join('\n'));
+
+  if (eventName === 'tool') handlers.onTool?.(data);
+  if (eventName === 'token') handlers.onToken?.(data.content || '');
+  if (eventName === 'done') handlers.onDone?.();
+  if (eventName === 'error') throw new Error(data.content || '流式对话失败');
+}
+```
+
+调用示例：
+
+```javascript
+const answer = document.querySelector('#answer');
+answer.textContent = '';
+
+await streamChat('查询设备 436289 的上级电源', {
+  onTool: handleToolResult,
+  onToken: content => { answer.textContent += content; },
+  onDone: () => { console.log('本次回答完成'); }
+});
+```
+
+以上示例使用相对路径，适用于前端和服务端同源部署。如果前端部署在其他域名，需要将地址改为完整的服务端 URL，并在服务端配置允许该前端域名跨域访问。
 
 ## 构建与测试
 

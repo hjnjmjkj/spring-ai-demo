@@ -4,8 +4,6 @@ spring:
       on-profile: intranet
   ai:
     openai:
-      audio:
-        speech: none
       api-key: ${INTRANET_LLM_API_KEY:EMPTY}
       timeout: 120s
       chat:

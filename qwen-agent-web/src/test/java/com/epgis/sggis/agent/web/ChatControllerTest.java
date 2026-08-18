@@ -10,7 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.epgis.sggis.agent.chat.AgentReply;
 import com.epgis.sggis.agent.chat.ChatService;
+import com.epgis.sggis.agent.chat.McpToolResult;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -26,7 +30,6 @@ class ChatControllerTest {
 
     private ChatService chatService;
     private MockMvc mockMvc;
-
     @BeforeEach
     void setUp() {
         chatService = mock(ChatService.class);
@@ -39,15 +42,20 @@ class ChatControllerTest {
     }
 
     @Test
-    void returnsSynchronousResponse() throws Exception {
-        when(chatService.chat(CONVERSATION_ID, "你好")).thenReturn("你好！");
+    void returnsSynchronousStructuredResponse() throws Exception {
+        McpToolResult toolResult = toolResult();
+        when(chatService.chat(CONVERSATION_ID, "你好"))
+                .thenReturn(new AgentReply("你好！", List.of(toolResult)));
 
         mockMvc.perform(post("/api/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest("你好")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.conversationId").value(CONVERSATION_ID))
-                .andExpect(jsonPath("$.content").value("你好！"));
+                .andExpect(jsonPath("$.content").value("你好！"))
+                .andExpect(jsonPath("$.toolResults[0].toolName").value("searchPowerEquipment"))
+                .andExpect(jsonPath("$.toolResults[0].arguments.keyword").value("436289"))
+                .andExpect(jsonPath("$.toolResults[0].result.searchId").value("search-1"));
     }
 
     @Test
@@ -69,8 +77,9 @@ class ChatControllerTest {
     }
 
     @Test
-    void streamsNamedSseEvents() throws Exception {
-        when(chatService.stream(anyString(), anyString())).thenReturn(Flux.just("你", "好"));
+    void streamsToolTokenAndDoneEvents() throws Exception {
+        when(chatService.stream(anyString(), anyString()))
+                .thenReturn(Flux.just(new AgentReply("你好", List.of(toolResult()))));
 
         MvcResult pending = mockMvc.perform(post("/api/chat/stream")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,8 +91,17 @@ class ChatControllerTest {
         mockMvc.perform(asyncDispatch(pending))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("event:tool")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("searchPowerEquipment")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event:token")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event:done")));
+    }
+
+    private McpToolResult toolResult() {
+        return new McpToolResult(
+                "searchPowerEquipment",
+                Map.of("keyword", "436289"),
+                Map.of("searchId", "search-1"));
     }
 
     private String jsonRequest(String message) {

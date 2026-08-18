@@ -45,12 +45,49 @@ function setBusy(busy) {
 function addMessage(role, content = '', isError = false) {
     const article = document.createElement('article');
     article.className = `message ${role}${isError ? ' error' : ''}`;
-    article.innerHTML = `<div class="avatar">${role === 'user' ? '你' : 'AI'}</div><div class="bubble"></div>`;
+    article.innerHTML = `<div class="avatar">${role === 'user' ? '你' : 'AI'}</div><div class="message-body"><div class="bubble"></div></div>`;
     const bubble = article.querySelector('.bubble');
     bubble.textContent = content;
     elements.messages.appendChild(article);
     scrollToBottom();
     return bubble;
+}
+
+function renderToolResult(bubble, toolResult) {
+    if (!toolResult || typeof toolResult !== 'object') return;
+    const messageBody = bubble.closest('.message-body');
+    if (!messageBody) return;
+
+    let container = messageBody.querySelector('.tool-results');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'tool-results';
+        messageBody.insertBefore(container, bubble);
+    }
+
+    const details = document.createElement('details');
+    details.className = 'tool-result';
+    const summary = document.createElement('summary');
+    summary.textContent = `工具执行：${toolResult.toolName || '未知工具'}`;
+    details.appendChild(summary);
+
+    if (toolResult.arguments != null) {
+        details.appendChild(toolResultSection('调用参数', toolResult.arguments));
+    }
+    if (toolResult.result != null) {
+        details.appendChild(toolResultSection('执行结果', toolResult.result));
+    }
+    container.appendChild(details);
+}
+
+function toolResultSection(title, value) {
+    const section = document.createElement('section');
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    const content = document.createElement('pre');
+    content.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    section.append(heading, content);
+    return section;
 }
 
 function scrollToBottom() {
@@ -80,6 +117,7 @@ async function sendSync(payload, bubble) {
     if (!response.ok) throw await responseError(response, '请求失败');
     const body = await response.json();
     bubble.textContent = body.content || '模型没有返回内容。';
+    (body.toolResults || []).forEach(result => renderToolResult(bubble, result));
 }
 
 async function sendStream(payload, bubble) {
@@ -118,10 +156,14 @@ function processEvent(frame, bubble) {
     });
     if (!dataLines.length) return;
     const rawData = dataLines.join('\n');
-    let content = rawData;
-    try { content = JSON.parse(rawData).content ?? ''; } catch (_) { /* 文本事件 */ }
+    let data = rawData;
+    try { data = JSON.parse(rawData); } catch (_) { /* 文本事件 */ }
+    const content = typeof data === 'object' && data !== null ? data.content ?? '' : data;
     if (eventName === 'token') {
         bubble.textContent += content;
+        scrollToBottom();
+    } else if (eventName === 'tool') {
+        renderToolResult(bubble, data);
         scrollToBottom();
     } else if (eventName === 'error') {
         throw new Error(content || 'SSE 请求失败');

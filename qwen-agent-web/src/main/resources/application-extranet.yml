@@ -4,14 +4,15 @@ spring:
       on-profile: extranet
   ai:
     openai:
+      audio:
+        speech: none
+      api-key: ${DASHSCOPE_API_KEY:sk-ws-H.ERXERRI.X6IN.MEQCIBFwjJo_-iphKj4Jv2_gbR4doKN-btXB8UI2L9S2nYJMAiAxwGg2nybaLpCOE88SjyE_Q2QGKd0g9wozUODCe-Ev9Q}
       chat:
         base-url: ${QWEN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
-        api-key: ${DASHSCOPE_API_KEY}
         model: ${QWEN_MODEL:qwen3.7-plus}
         temperature: 0.2
       embedding:
         base-url: ${QWEN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
-        api-key: ${DASHSCOPE_API_KEY}
         model: ${QWEN_EMBEDDING_MODEL:text-embedding-v4}
         dimensions: ${QWEN_EMBEDDING_DIMENSIONS:1024}
     vectorstore:

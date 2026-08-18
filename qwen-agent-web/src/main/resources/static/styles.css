@@ -112,12 +112,20 @@ button { cursor: pointer; }
 
 .message { display: flex; gap: 12px; margin-bottom: 22px; align-items: flex-start; }
 .message.user { flex-direction: row-reverse; }
+.message-body { display: grid; gap: 8px; max-width: min(76%, 680px); }
+.user .message-body { justify-items: end; }
 .avatar { flex: 0 0 34px; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; background: var(--accent); color: white; font-size: 11px; font-weight: 800; }
 .user .avatar { background: #c9872a; }
-.bubble { max-width: min(76%, 680px); padding: 13px 16px; border-radius: 6px 18px 18px 18px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; background: white; border: 1px solid var(--line); }
+.bubble { width: fit-content; max-width: 100%; padding: 13px 16px; border-radius: 6px 18px 18px 18px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; background: white; border: 1px solid var(--line); }
 .user .bubble { border-radius: 18px 6px 18px 18px; color: white; background: var(--accent); border-color: var(--accent); }
 .message.error .bubble { color: var(--danger); background: #fff2ef; border-color: rgba(166, 61, 50, 0.24); }
 .typing::after { content: "▋"; color: var(--accent); animation: blink 0.8s infinite; }
+.tool-results { display: grid; gap: 6px; }
+.tool-result { overflow: hidden; border: 1px solid rgba(18, 110, 90, 0.2); border-radius: 12px; background: var(--accent-soft); }
+.tool-result summary { padding: 9px 12px; color: var(--accent-dark); cursor: pointer; font-size: 13px; font-weight: 700; }
+.tool-result section { padding: 0 12px 10px; }
+.tool-result strong { display: block; margin: 3px 0 5px; color: var(--muted); font-size: 12px; }
+.tool-result pre { max-height: 240px; margin: 0; padding: 9px 10px; overflow: auto; border-radius: 8px; background: rgba(255, 255, 255, 0.78); color: var(--ink); font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .composer { margin: 0 26px 26px; padding: 12px 14px 10px; border: 1px solid var(--line); border-radius: 20px; background: white; box-shadow: 0 8px 28px rgba(25, 35, 31, 0.08); }
 .composer:focus-within { border-color: rgba(18, 110, 90, 0.55); box-shadow: 0 8px 30px rgba(18, 110, 90, 0.12); }
@@ -155,7 +163,7 @@ button { cursor: pointer; }
     .subtitle { font-size: 13px; }
     .toolbar { padding: 10px 20px; }
     .messages { max-height: none; padding: 22px 18px; }
-    .bubble { max-width: 86%; }
+    .message-body { max-width: 86%; }
     .composer { margin: 0 12px 12px; }
     .secondary-button { padding: 8px 12px; font-size: 13px; }
     .app-header { flex-direction: column; }

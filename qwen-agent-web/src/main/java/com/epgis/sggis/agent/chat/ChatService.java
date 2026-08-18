@@ -1,7 +1,5 @@
 package com.epgis.sggis.agent.chat;
 
-import java.util.Objects;
-
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -16,20 +14,20 @@ public class ChatService {
         this.agentClient = agentClient;
     }
 
-    public String chat(String conversationId, String message) {
+    public AgentReply chat(String conversationId, String message) {
         try {
-            String content = agentClient.call(conversationId, message);
-            return Objects.requireNonNullElse(content, "");
+            AgentReply reply = agentClient.call(conversationId, message);
+            return reply == null ? new AgentReply("", null) : reply;
         }
         catch (RuntimeException exception) {
             throw new ChatServiceException(FAILURE_MESSAGE, exception);
         }
     }
 
-    public Flux<String> stream(String conversationId, String message) {
+    public Flux<AgentReply> stream(String conversationId, String message) {
         try {
             return agentClient.stream(conversationId, message)
-                    .filter(Objects::nonNull)
+                    .filter(reply -> reply != null)
                     .onErrorMap(exception -> new ChatServiceException(FAILURE_MESSAGE, exception));
         }
         catch (RuntimeException exception) {

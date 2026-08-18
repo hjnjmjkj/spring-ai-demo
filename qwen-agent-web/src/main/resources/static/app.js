@@ -25,9 +25,18 @@ let activeController = null;
 function loadConversationId() {
     const stored = localStorage.getItem('qwenConversationId');
     if (stored) return stored;
-    const created = crypto.randomUUID();
+    const created = createConversationId();
     localStorage.setItem('qwenConversationId', created);
     return created;
+}
+
+function createConversationId() {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0'));
+    return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10).join('')}`;
 }
 
 function setStatus(type, text) {
@@ -203,7 +212,7 @@ elements.form.addEventListener('submit', async event => {
 elements.stop.addEventListener('click', () => activeController?.abort());
 elements.newChat.addEventListener('click', () => {
     activeController?.abort();
-    conversationId = crypto.randomUUID();
+    conversationId = createConversationId();
     localStorage.setItem('qwenConversationId', conversationId);
     elements.messages.innerHTML = '';
     addMessage('assistant', '新会话已经开始。有什么可以帮你？');

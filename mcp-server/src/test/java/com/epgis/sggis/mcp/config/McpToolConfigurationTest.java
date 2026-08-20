@@ -6,6 +6,10 @@ import com.epgis.sggis.mcp.calculator.CalculatorService;
 import com.epgis.sggis.mcp.grid.LineTransformerService;
 import com.epgis.sggis.mcp.grid.NearbyEquipmentService;
 import com.epgis.sggis.mcp.power.PowerTraceService;
+import com.epgis.sggis.mcp.scene.ConstructionProjectService;
+import com.epgis.sggis.mcp.scene.DeviceLocationService;
+import com.epgis.sggis.mcp.scene.GeometryRegionService;
+import com.epgis.sggis.mcp.scene.HostedLayerService;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallbackProvider;
@@ -16,10 +20,15 @@ class McpToolConfigurationTest {
     void registersCalculatorAndPowerTraceTools() {
         ToolCallbackProvider provider = new McpToolConfiguration()
                 .mcpTools(new CalculatorService(), new PowerTraceService(),
-                        new LineTransformerService(), new NearbyEquipmentService());
+                        new LineTransformerService(), new NearbyEquipmentService(),
+                        new DeviceLocationService(), new HostedLayerService(),
+                        new GeometryRegionService(), new ConstructionProjectService());
 
-        assertThat(Arrays.stream(provider.getToolCallbacks())
-                .map(callback -> callback.getToolDefinition().name()))
+        var toolNames = Arrays.stream(provider.getToolCallbacks())
+                .map(callback -> callback.getToolDefinition().name())
+                .toList();
+
+        assertThat(toolNames)
                 .containsExactlyInAnyOrder(
                         "calculate",
                         "searchPowerEquipment",
@@ -27,6 +36,21 @@ class McpToolConfigurationTest {
                         "queryPowerEquipmentDetails",
                         "queryLineDistributionTransformers",
                         "geocodeAddress",
-                        "queryNearbyPowerEquipment");
+                        "queryNearbyPowerEquipment",
+                        "locateEquipment",
+                        "viewHostedLayer",
+                        "drawGeometryRegion",
+                        "browseConstructionProject");
+        assertThat(toolNames).doesNotContain(
+                "searchEquipmentForLocation",
+                "queryEquipmentDetailForLocation",
+                "queryApplicationsForHostedLayer",
+                "queryHostedLayersForApplication",
+                "queryOrganizationCatalogForRegion",
+                "queryOrganizationBoundaryForRegion",
+                "searchEquipmentForBuffer",
+                "queryEquipmentDetailForBuffer",
+                "analyzeGeometryBufferForRegion",
+                "queryConstructionProjects");
     }
 }

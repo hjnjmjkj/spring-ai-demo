@@ -12,7 +12,7 @@ spring:
         name: sggis-mcp-server
         version: 1.0.0
         type: SYNC
-        instructions: "提供精确计算、电源追溯、线路配变查询，以及地址地理编码和周边电网设备查询工具。电源追溯和地址周边查询必须按规定顺序调用。"
+        instructions: "提供精确计算、电源追溯、线路配变、地址周边设备、设备定位、托管图层查看、几何区域绘制和基建工程浏览工具。多候选结果必须先由用户确认；地图场景工具返回的 action 和 actionParams 交由前端渲染。"
         capabilities:
           tool: true
           resource: false

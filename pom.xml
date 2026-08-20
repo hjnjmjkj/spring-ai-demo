@@ -17,7 +17,7 @@
     <packaging>pom</packaging>
 
     <name>Spring AI Qwen MCP Demo</name>
-    <description>Spring AI 2.0 Qwen agent with a calculator MCP server</description>
+    <description>Spring AI 2.0 Qwen agent with a GIS MCP server</description>
 
     <modules>
         <module>mcp-server</module>

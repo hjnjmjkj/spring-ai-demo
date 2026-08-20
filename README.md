@@ -1,13 +1,13 @@
 # Spring AI 2.0 + Qwen + MCP + RAG 示例
 
-这是一个 Java 21 / Maven 多模块项目。网页 Agent 通过阿里云百炼的 OpenAI 兼容接口调用 Qwen，通过 Streamable HTTP 调用独立的计算器 MCP Server，并使用 PostgreSQL + PGVector 实现知识库检索增强生成（RAG）。
+这是一个 Java 21 / Maven 多模块项目。网页 Agent 通过阿里云百炼的 OpenAI 兼容接口调用 Qwen，通过 Streamable HTTP 调用独立的 GIS MCP Server，并使用 PostgreSQL + PGVector 实现知识库检索增强生成（RAG）。
 
 ## 项目结构
 
 ```text
 spring-ai-qwen-mcp-demo
 ├── docker/            # PGVector Compose 配置，宿主机端口 5555
-├── mcp-server/        # 计算器 MCP Server，端口 8081，端点 /mcp
+├── mcp-server/        # 计算和 GIS 场景 MCP Server，端口 8081，端点 /mcp
 └── qwen-agent-web/    # Qwen Agent、RAG、REST/SSE API 和聊天网页，端口 8080
 ```
 
@@ -73,36 +73,30 @@ mvn -pl qwen-agent-web spring-boot:run
 
 浏览器访问 [http://localhost:8080](http://localhost:8080)。点击“添加知识”粘贴资料，保存后即可直接针对该资料提问；计算类问题仍会调用 MCP 的 `calculate` 工具。
 
-## 电源追溯对话场景
+## MCP 工具和地图场景
 
-MCP Server 提供三个必须连续调用的模拟工具：
+MCP Server 当前提供五个聚合工具：
 
-1. `searchPowerEquipment`：模拟 `/datasearchservice/equipment/search`，按名称、OID 或设备ID检索设备。
-2. `tracePowerSource`：模拟 `/powergridtoposervice/advancedanalysis/powersource`，返回从电源点到目标设备的有序路径。
-3. `queryPowerEquipmentDetails`：按 `typeId` 分组模拟调用 `/queryservice/psrquery/objects`，补齐路径设备名称和属性。
+1. `calculate`：执行精确的两数四则运算。
+2. `locateEquipment`：按设备名称、OID 或设备ID查询并返回 `LOCATE_EQUIPMENT` 地图动作。
+3. `viewHostedLayer`：按应用名称和图层名称查询并返回 `LOAD_HOSTED_LAYER` 地图动作。
+4. `drawGeometryRegion`：查询组织边界或生成设备缓冲区，返回 `DRAW_REGION` 地图动作。
+5. `browseConstructionProject`：查询基建工程及模型服务，返回 `SHOW_CONSTRUCTION_PROJECT` 地图动作。
 
-前两步分别返回 `searchId` 和 `traceId`，后续工具必须携带这些标识，因此不能跳步。名称匹配到多个设备时，Agent 会先列出候选并等待用户确认。
+地图工具统一返回 `status`、`action`、`actionParams`、`candidates` 和 `message`。`status` 为
+`NEED_CONFIRMATION` 时，Agent 必须先让用户从 `candidates` 中确认目标；只有 `COMPLETED` 结果才应交给前端执行地图动作。
 
 可以在网页中尝试：
 
 ```text
-查询厦门市同安益群服装加工厂#1变的上级电源
-查询中闽线#20的电源来自哪里
-查询一号配变的上级电源
+定位中闽线
+打开配网运检应用中的设备缺陷图层
+绘制厦门市供电公司的管理范围
+绘制中闽线周边500米缓冲区
+查看厦门同安输变电工程
 ```
 
-第三条会命中“东区一号配变”和“西区一号配变”，用于演示多轮确认后继续调用。模拟数据只用于演示接口编排，不代表真实电网拓扑。
-
-另外两个 GIS 场景也已经提供：
-
-```text
-查询中闽线下的所有配电变压器
-查询厦门市思明区莲前西路859号周边1公里内的变电站和变压器
-```
-
-- 线路配变场景调用 `queryLineDistributionTransformers`，模拟 `/queryservice/psrquery/line/{psrid}/contains?typeids=302000`。
-- 地址周边场景先调用 `geocodeAddress` 模拟 `/mapservice/geocode/geo`，再携带 `geocodeId` 调用 `queryNearbyPowerEquipment` 模拟 `/mapservice/spatial/equip/buffer`。
-- 周边查询支持 `STATION`、`TRANSFORMER` 和 `ALL` 三种设备类别，结果按距离从近到远排列；半径范围为大于0且不超过50公里。
+以上数据和业务接口调用记录均为演示数据，不代表真实电网和工程数据。
 
 停止数据库：
 
@@ -156,10 +150,16 @@ curl -X POST http://localhost:8080/api/chat \
   "content": "已找到目标设备。",
   "toolResults": [
     {
-      "toolName": "searchPowerEquipment",
-      "arguments": { "keyword": "436289" },
+      "toolName": "locateEquipment",
+      "arguments": { "keyword": "中闽线" },
       "result": {
-        "searchId": "...",
+        "status": "COMPLETED",
+        "action": "LOCATE_EQUIPMENT",
+        "actionParams": {
+          "equipment": { "oid": "1516289", "name": "中闽线" },
+          "geometry": { "type": "LineString", "coordinates": [] },
+          "highlight": true
+        },
         "candidates": []
       }
     }
@@ -224,20 +224,31 @@ async function chat(message) {
 }
 ```
 
-可以根据 `toolName` 将 MCP 结果交给不同的业务组件。工具名启用 MCP 前缀时仍可使用 `endsWith` 匹配原始名称：
+地图工具应先检查 `status`，再根据稳定的 `action` 字段分发给不同业务组件，不要依赖可能带 MCP 前缀的工具名：
 
 ```javascript
 function handleToolResult(tool) {
-  if (tool.toolName.endsWith('searchPowerEquipment')) {
-    renderEquipmentCandidates(tool.result.candidates || []);
+  const result = tool.result;
+  if (!result) return;
+
+  if (result.status === 'NEED_CONFIRMATION') {
+    renderCandidates(result.candidates || []);
     return;
   }
-  if (tool.toolName.endsWith('tracePowerSource')) {
-    renderPowerPath(tool.result.paths || []);
+  if (result.status !== 'COMPLETED') {
+    showMessage(result.message || '地图操作未完成');
     return;
   }
-  if (tool.toolName.endsWith('queryPowerEquipmentDetails')) {
-    renderPowerDetails(tool.result.paths || []);
+
+  const handler = {
+    LOCATE_EQUIPMENT: locateEquipment,
+    LOAD_HOSTED_LAYER: loadHostedLayer,
+    DRAW_REGION: drawRegion,
+    SHOW_CONSTRUCTION_PROJECT: showConstructionProject
+  }[result.action];
+
+  if (handler) {
+    handler(result.actionParams);
     return;
   }
 

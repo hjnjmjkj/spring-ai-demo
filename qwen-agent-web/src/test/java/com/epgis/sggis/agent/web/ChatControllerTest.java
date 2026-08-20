@@ -53,9 +53,10 @@ class ChatControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.conversationId").value(CONVERSATION_ID))
                 .andExpect(jsonPath("$.content").value("你好！"))
-                .andExpect(jsonPath("$.toolResults[0].toolName").value("searchPowerEquipment"))
-                .andExpect(jsonPath("$.toolResults[0].arguments.keyword").value("436289"))
-                .andExpect(jsonPath("$.toolResults[0].result.searchId").value("search-1"));
+                .andExpect(jsonPath("$.toolResults[0].toolName").value("locateEquipment"))
+                .andExpect(jsonPath("$.toolResults[0].arguments.keyword").value("中闽线"))
+                .andExpect(jsonPath("$.toolResults[0].result.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.toolResults[0].result.action").value("LOCATE_EQUIPMENT"));
     }
 
     @Test
@@ -92,16 +93,19 @@ class ChatControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event:tool")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("searchPowerEquipment")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("locateEquipment")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event:token")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event:done")));
     }
 
     private McpToolResult toolResult() {
         return new McpToolResult(
-                "searchPowerEquipment",
-                Map.of("keyword", "436289"),
-                Map.of("searchId", "search-1"));
+                "locateEquipment",
+                Map.of("keyword", "中闽线"),
+                Map.of(
+                        "status", "COMPLETED",
+                        "action", "LOCATE_EQUIPMENT",
+                        "actionParams", Map.of("highlight", true)));
     }
 
     private String jsonRequest(String message) {

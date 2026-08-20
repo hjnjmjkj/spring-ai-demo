@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>mcp-server</artifactId>
-    <name>MCP Calculator Server</name>
+    <name>MCP GIS Server</name>
 
     <dependencies>
         <dependency>

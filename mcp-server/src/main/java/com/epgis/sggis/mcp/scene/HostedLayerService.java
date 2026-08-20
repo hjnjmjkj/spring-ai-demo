@@ -1,5 +1,6 @@
 package com.epgis.sggis.mcp.scene;
 
+import com.epgis.sggis.mcp.model.ToolResultStatus;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,19 +43,19 @@ public class HostedLayerService {
                 .filter(item -> containsIgnoreCase(item.layerAlias(), requestedLayer))
                 .toList();
         if (matches.isEmpty()) {
-            return new HostedLayerResult("NOT_FOUND", null, null, List.of(), calls,
-                    "没有找到应用“" + requestedApp + "”下名为“" + requestedLayer + "”的托管图层。");
+            return new HostedLayerResult(ToolResultStatus.NOT_FOUND, null, null, List.of(), calls,
+                    ToolResultStatus.NOT_FOUND.msg());
         }
         if (matches.size() > 1) {
-            return new HostedLayerResult("NEED_CONFIRMATION", null, null,
+            return new HostedLayerResult(ToolResultStatus.NEED_CONFIRMATION, null, null,
                     matches.stream().map(LayerCandidate::from).toList(), calls,
-                    "匹配到多个托管图层，请让用户确认具体图层。");
+                    ToolResultStatus.NEED_CONFIRMATION.msg());
         }
         HostedLayer selected = matches.getFirst();
         LayerCandidate layer = LayerCandidate.from(selected);
-        return new HostedLayerResult("COMPLETED", ACTION,
+        return new HostedLayerResult(ToolResultStatus.COMPLETED, ACTION,
                 new HostedLayerActionParams(layer, "3D", true), List.of(), calls,
-                "已找到托管图层“" + selected.layerAlias() + "”，前端可在三维场景加载。");
+                ToolResultStatus.COMPLETED.msg());
     }
 
     private static void requireText(String value, String message) {
@@ -82,6 +83,6 @@ public class HostedLayerService {
 
     public record EndpointCall(String method, String endpoint, Map<String, Object> parameters) { }
     public record HostedLayerActionParams(LayerCandidate layer, String sceneMode, boolean visible) { }
-    public record HostedLayerResult(String status, String action, HostedLayerActionParams actionParams,
+    public record HostedLayerResult(ToolResultStatus status, String action, HostedLayerActionParams actionParams,
             List<LayerCandidate> candidates, List<EndpointCall> endpointCalls, String message) { }
 }

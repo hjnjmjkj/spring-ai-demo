@@ -1,5 +1,6 @@
 package com.epgis.sggis.mcp.scene2;
 
+import com.epgis.sggis.mcp.model.ToolResultStatus;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -48,9 +49,10 @@ public class DeviceLocationTools {
             case 1 -> "使用候选项的typeId和oid调用queryEquipmentDetailForLocation。";
             default -> "存在多个候选，先让用户确认，再调用queryEquipmentDetailForLocation。";
         };
-        return new EquipmentSearchResult(SEARCH_ENDPOINT,
+        ToolResultStatus status = candidateStatus(candidates.size());
+        return new EquipmentSearchResult(status, SEARCH_ENDPOINT,
                 Map.of("keyword", requested, "keywordType", 4, "pageNum", 1, "pageSize", 20),
-                candidates, nextAction);
+                candidates, status.msg(), nextAction);
     }
 
     @Tool(description = """
@@ -72,10 +74,18 @@ public class DeviceLocationTools {
                 selected.name(), selected.geometryKind(), selected.voltageLevel(), selected.geometry());
         LocateActionParams params = new LocateActionParams(detail,
                 "POINT".equals(selected.geometryKind()) ? "substation" : "power-line", true);
-        return new EquipmentDetailResult(endpoint,
+        return new EquipmentDetailResult(ToolResultStatus.COMPLETED, endpoint,
                 Map.of("iscodetsf", false, "isterminal", false, "versionid", "0", "cstype", "lonlat",
                         "isGeojsonFormat", true),
-                detail, "LOCATE_EQUIPMENT", params, "已查询设备详情，可交由前端定位。");
+                detail, "LOCATE_EQUIPMENT", params, ToolResultStatus.COMPLETED.msg());
+    }
+
+    private static ToolResultStatus candidateStatus(int candidateCount) {
+        return switch (candidateCount) {
+            case 0 -> ToolResultStatus.NOT_FOUND;
+            case 1 -> ToolResultStatus.READY_FOR_NEXT_STEP;
+            default -> ToolResultStatus.NEED_CONFIRMATION;
+        };
     }
 
     private static void requireText(String value, String message) {
@@ -95,11 +105,11 @@ public class DeviceLocationTools {
                     item.geometryKind());
         }
     }
-    public record EquipmentSearchResult(String endpoint, Map<String, Object> request,
-            List<EquipmentCandidate> candidates, String nextAction) { }
+    public record EquipmentSearchResult(ToolResultStatus status, String endpoint, Map<String, Object> request,
+            List<EquipmentCandidate> candidates, String message, String nextAction) { }
     public record EquipmentDetail(String oid, String typeId, String deviceId, String name,
             String geometryKind, String voltageLevel, GeoJsonGeometry geometry) { }
     public record LocateActionParams(EquipmentDetail equipment, String icon, boolean highlight) { }
-    public record EquipmentDetailResult(String endpoint, Map<String, Object> request,
+    public record EquipmentDetailResult(ToolResultStatus status, String endpoint, Map<String, Object> request,
             EquipmentDetail equipment, String action, LocateActionParams actionParams, String message) { }
 }

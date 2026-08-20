@@ -1,5 +1,6 @@
 package com.epgis.sggis.mcp.scene2;
 
+import com.epgis.sggis.mcp.model.ToolResultStatus;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -49,14 +50,14 @@ public class ConstructionProjectTools {
             ModelService defaultModel = selected.models().isEmpty() ? null : selected.models().getFirst();
             params = new ProjectActionParams(selected, defaultModel, true);
         }
-        String message = switch (projects.size()) {
-            case 0 -> "没有找到匹配工程。";
-            case 1 -> "已找到唯一工程，默认加载第一个模型。";
-            default -> "匹配到多个工程，请让用户确认后使用工程ID再次调用。";
+        ToolResultStatus status = switch (projects.size()) {
+            case 0 -> ToolResultStatus.NOT_FOUND;
+            case 1 -> ToolResultStatus.COMPLETED;
+            default -> ToolResultStatus.NEED_CONFIRMATION;
         };
-        return new ProjectListResult(PROJECT_LIST_ENDPOINT,
+        return new ProjectListResult(status, PROJECT_LIST_ENDPOINT,
                 Map.of("keyword", requested, "pageNum", 1, "pageSize", 20),
-                projects, action, params, message);
+                projects, action, params, status.msg());
     }
 
     public record ModelService(String modelId, String modelName, String modelType, String serviceUrl) { }
@@ -64,6 +65,7 @@ public class ConstructionProjectTools {
             String region, List<ModelService> models) { }
     public record ProjectActionParams(ProjectInfo project, ModelService defaultModel,
             boolean autoLoadDefaultModel) { }
-    public record ProjectListResult(String endpoint, Map<String, Object> request, List<ProjectInfo> projects,
+    public record ProjectListResult(ToolResultStatus status, String endpoint,
+            Map<String, Object> request, List<ProjectInfo> projects,
             String action, ProjectActionParams actionParams, String message) { }
 }

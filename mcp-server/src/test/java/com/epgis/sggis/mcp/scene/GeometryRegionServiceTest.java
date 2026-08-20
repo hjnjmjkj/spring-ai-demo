@@ -3,6 +3,7 @@ package com.epgis.sggis.mcp.scene;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.epgis.sggis.mcp.model.ToolResultStatus;
 import org.junit.jupiter.api.Test;
 
 class GeometryRegionServiceTest {
@@ -11,7 +12,7 @@ class GeometryRegionServiceTest {
     void drawsOrganizationBoundaryWhenDistanceIsZero() {
         var result = new GeometryRegionService().drawGeometryRegion("同安区供电中心", 0);
 
-        assertThat(result.status()).isEqualTo("COMPLETED");
+        assertThat(result.status()).isEqualTo(ToolResultStatus.COMPLETED);
         assertThat(result.action()).isEqualTo(GeometryRegionService.ACTION);
         assertThat(result.actionParams().mode()).isEqualTo("ORGANIZATION_BOUNDARY");
         assertThat(result.actionParams().geometry().type()).isEqualTo("Polygon");
@@ -25,7 +26,7 @@ class GeometryRegionServiceTest {
     void searchesEquipmentAndDrawsBuffer() {
         var result = new GeometryRegionService().drawGeometryRegion("中闽线", 50);
 
-        assertThat(result.status()).isEqualTo("COMPLETED");
+        assertThat(result.status()).isEqualTo(ToolResultStatus.COMPLETED);
         assertThat(result.actionParams().mode()).isEqualTo("EQUIPMENT_BUFFER");
         assertThat(result.actionParams().bufferDistanceMeters()).isEqualTo(50);
         assertThat(result.endpointCalls()).extracting(GeometryRegionService.EndpointCall::endpoint)

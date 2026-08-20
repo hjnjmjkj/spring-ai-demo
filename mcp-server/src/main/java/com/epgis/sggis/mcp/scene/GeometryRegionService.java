@@ -1,5 +1,6 @@
 package com.epgis.sggis.mcp.scene;
 
+import com.epgis.sggis.mcp.model.ToolResultStatus;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -56,13 +57,13 @@ public class GeometryRegionService {
                 .filter(item -> containsIgnoreCase(item.name(), target) || item.iscId().equalsIgnoreCase(target))
                 .toList();
         if (matches.isEmpty()) {
-            return notFound(calls, "没有找到组织机构“" + target + "”。");
+            return notFound(calls);
         }
         if (matches.size() > 1) {
-            return new GeometryRegionResult("NEED_CONFIRMATION", null, null,
+            return new GeometryRegionResult(ToolResultStatus.NEED_CONFIRMATION, null, null,
                     matches.stream().map(item -> new TargetCandidate(item.iscId(), "ORGANIZATION", item.name()))
                             .toList(),
-                    calls, "匹配到多个组织机构，请让用户确认。");
+                    calls, ToolResultStatus.NEED_CONFIRMATION.msg());
         }
         Organization selected = matches.getFirst();
         List<EndpointCall> completedCalls = new ArrayList<>(calls);
@@ -70,8 +71,8 @@ public class GeometryRegionService {
                 Map.of("iscIds", List.of(selected.iscId()), "cstype", "lonlat", "isDilution", false)));
         GeometryActionParams params = new GeometryActionParams("ORGANIZATION_BOUNDARY", selected.name(),
                 selected.boundary(), 0, "#2F80ED", "rgba(47,128,237,0.25)");
-        return new GeometryRegionResult("COMPLETED", ACTION, params, List.of(), completedCalls,
-                "已获取“" + selected.name() + "”的经营管理区边界。");
+        return new GeometryRegionResult(ToolResultStatus.COMPLETED, ACTION, params, List.of(), completedCalls,
+                ToolResultStatus.COMPLETED.msg());
     }
 
     private GeometryRegionResult equipmentBuffer(String target, double distanceMeters) {
@@ -81,13 +82,13 @@ public class GeometryRegionService {
                 .filter(item -> containsIgnoreCase(item.name(), target) || item.oid().equalsIgnoreCase(target))
                 .toList();
         if (matches.isEmpty()) {
-            return notFound(List.of(searchCall), "没有找到设备“" + target + "”。");
+            return notFound(List.of(searchCall));
         }
         if (matches.size() > 1) {
-            return new GeometryRegionResult("NEED_CONFIRMATION", null, null,
+            return new GeometryRegionResult(ToolResultStatus.NEED_CONFIRMATION, null, null,
                     matches.stream().map(item -> new TargetCandidate(item.oid(), item.typeId(), item.name()))
                             .toList(),
-                    List.of(searchCall), "匹配到多个设备，请让用户确认后使用OID再次调用。");
+                    List.of(searchCall), ToolResultStatus.NEED_CONFIRMATION.msg());
         }
         Equipment selected = matches.getFirst();
         String detailEndpoint = EQUIPMENT_DETAIL_ENDPOINT
@@ -101,16 +102,13 @@ public class GeometryRegionService {
         GeoJsonGeometry buffered = createBoundingBuffer(selected.geometry(), distanceMeters);
         GeometryActionParams params = new GeometryActionParams("EQUIPMENT_BUFFER", selected.name(), buffered,
                 distanceMeters, "#F2994A", "rgba(242,153,74,0.25)");
-        return new GeometryRegionResult("COMPLETED", ACTION, params, List.of(), calls,
-                "已生成设备“" + selected.name() + "”的" + formatDistance(distanceMeters) + "米缓冲区。");
+        return new GeometryRegionResult(ToolResultStatus.COMPLETED, ACTION, params, List.of(), calls,
+                ToolResultStatus.COMPLETED.msg());
     }
 
-    private static GeometryRegionResult notFound(List<EndpointCall> calls, String message) {
-        return new GeometryRegionResult("NOT_FOUND", null, null, List.of(), calls, message);
-    }
-
-    private static String formatDistance(double distance) {
-        return distance == Math.rint(distance) ? Long.toString((long) distance) : Double.toString(distance);
+    private static GeometryRegionResult notFound(List<EndpointCall> calls) {
+        return new GeometryRegionResult(ToolResultStatus.NOT_FOUND, null, null, List.of(), calls,
+                ToolResultStatus.NOT_FOUND.msg());
     }
 
     private static boolean containsIgnoreCase(String value, String keyword) {
@@ -151,6 +149,6 @@ public class GeometryRegionService {
     public record EndpointCall(String method, String endpoint, Map<String, Object> parameters) { }
     public record GeometryActionParams(String mode, String name, GeoJsonGeometry geometry,
             double bufferDistanceMeters, String strokeColor, String fillColor) { }
-    public record GeometryRegionResult(String status, String action, GeometryActionParams actionParams,
+    public record GeometryRegionResult(ToolResultStatus status, String action, GeometryActionParams actionParams,
             List<TargetCandidate> candidates, List<EndpointCall> endpointCalls, String message) { }
 }

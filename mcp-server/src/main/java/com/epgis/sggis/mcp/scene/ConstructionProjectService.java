@@ -1,5 +1,6 @@
 package com.epgis.sggis.mcp.scene;
 
+import com.epgis.sggis.mcp.model.ToolResultStatus;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,21 +42,20 @@ public class ConstructionProjectService {
         List<EndpointCall> calls = List.of(new EndpointCall("POST", PROJECT_LIST_ENDPOINT,
                 Map.of("keyword", requested, "pageNum", 1, "pageSize", 20)));
         if (matches.isEmpty()) {
-            return new ConstructionProjectResult("NOT_FOUND", null, null, List.of(), calls,
-                    "没有找到工程“" + requested + "”。");
+            return new ConstructionProjectResult(ToolResultStatus.NOT_FOUND, null, null, List.of(), calls,
+                    ToolResultStatus.NOT_FOUND.msg());
         }
         if (matches.size() > 1) {
-            return new ConstructionProjectResult("NEED_CONFIRMATION", null, null,
+            return new ConstructionProjectResult(ToolResultStatus.NEED_CONFIRMATION, null, null,
                     matches.stream().map(ProjectCandidate::from).toList(), calls,
-                    "匹配到多个工程，请让用户确认后使用工程ID再次调用。");
+                    ToolResultStatus.NEED_CONFIRMATION.msg());
         }
         ConstructionProject selected = matches.getFirst();
         ProjectCandidate project = ProjectCandidate.from(selected);
         ModelService defaultModel = selected.models().isEmpty() ? null : selected.models().getFirst();
         ProjectActionParams params = new ProjectActionParams(project, selected.models(), defaultModel, true);
-        return new ConstructionProjectResult("COMPLETED", ACTION, params, List.of(), calls,
-                "已查询工程“" + selected.projectName() + "”，共找到" + selected.models().size()
-                        + "个模型服务，默认加载第一个模型。");
+        return new ConstructionProjectResult(ToolResultStatus.COMPLETED, ACTION, params, List.of(), calls,
+                ToolResultStatus.COMPLETED.msg());
     }
 
     private static ConstructionProject project(String id, String name, String status, String region,
@@ -81,6 +81,6 @@ public class ConstructionProjectService {
     public record EndpointCall(String method, String endpoint, Map<String, Object> parameters) { }
     public record ProjectActionParams(ProjectCandidate project, List<ModelService> models,
             ModelService defaultModel, boolean autoLoadDefaultModel) { }
-    public record ConstructionProjectResult(String status, String action, ProjectActionParams actionParams,
+    public record ConstructionProjectResult(ToolResultStatus status, String action, ProjectActionParams actionParams,
             List<ProjectCandidate> candidates, List<EndpointCall> endpointCalls, String message) { }
 }

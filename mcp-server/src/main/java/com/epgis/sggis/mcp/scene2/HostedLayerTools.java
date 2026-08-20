@@ -1,5 +1,6 @@
 package com.epgis.sggis.mcp.scene2;
 
+import com.epgis.sggis.mcp.model.ToolResultStatus;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -35,7 +36,10 @@ public class HostedLayerTools {
                 .filter(item -> containsIgnoreCase(item.appName(), requested)
                         || item.appKey().equalsIgnoreCase(requested))
                 .toList();
-        return new ApplicationListResult(APPLICATION_LIST_ENDPOINT, Map.of("appName", requested), applications,
+        ToolResultStatus status = candidateStatus(applications.size());
+        return new ApplicationListResult(status, APPLICATION_LIST_ENDPOINT,
+                Map.of("appName", requested), applications,
+                status.msg(),
                 applications.size() == 1
                         ? "使用appKey、appName和图层名称调用queryHostedLayersForApplication。"
                         : "没有唯一应用时，请先补充或确认应用。");
@@ -61,15 +65,23 @@ public class HostedLayerTools {
         String action = layers.size() == 1 ? "LOAD_HOSTED_LAYER" : null;
         HostedLayerActionParams params = layers.size() == 1
                 ? new HostedLayerActionParams(layers.getFirst(), "3D", true) : null;
-        String message = switch (layers.size()) {
-            case 0 -> "没有找到匹配托管图层。";
-            case 1 -> "已找到唯一托管图层，可交由前端加载。";
-            default -> "匹配到多个托管图层，请让用户确认。";
+        ToolResultStatus status = switch (layers.size()) {
+            case 0 -> ToolResultStatus.NOT_FOUND;
+            case 1 -> ToolResultStatus.COMPLETED;
+            default -> ToolResultStatus.NEED_CONFIRMATION;
         };
-        return new HostedLayerListResult(LAYER_LIST_ENDPOINT,
+        return new HostedLayerListResult(status, LAYER_LIST_ENDPOINT,
                 Map.of("appName", appName.trim(), "layerAlias", layerName.trim(),
                         "queryType", 3, "page", 1, "size", 50),
-                layers, action, params, message);
+                layers, action, params, status.msg());
+    }
+
+    private static ToolResultStatus candidateStatus(int candidateCount) {
+        return switch (candidateCount) {
+            case 0 -> ToolResultStatus.NOT_FOUND;
+            case 1 -> ToolResultStatus.READY_FOR_NEXT_STEP;
+            default -> ToolResultStatus.NEED_CONFIRMATION;
+        };
     }
 
     private static void requireText(String value, String message) {
@@ -85,14 +97,15 @@ public class HostedLayerTools {
     private record HostedLayer(int layerId, String appKey, String appName, String layerAlias, int state) { }
 
     public record ApplicationInfo(String appKey, String appName) { }
-    public record ApplicationListResult(String endpoint, Map<String, Object> request,
-            List<ApplicationInfo> applications, String nextAction) { }
+    public record ApplicationListResult(ToolResultStatus status, String endpoint, Map<String, Object> request,
+            List<ApplicationInfo> applications, String message, String nextAction) { }
     public record LayerInfo(int layerId, String appKey, String appName, String layerAlias, int state) {
         static LayerInfo from(HostedLayer item) {
             return new LayerInfo(item.layerId(), item.appKey(), item.appName(), item.layerAlias(), item.state());
         }
     }
     public record HostedLayerActionParams(LayerInfo layer, String sceneMode, boolean visible) { }
-    public record HostedLayerListResult(String endpoint, Map<String, Object> request, List<LayerInfo> layers,
+    public record HostedLayerListResult(ToolResultStatus status, String endpoint,
+            Map<String, Object> request, List<LayerInfo> layers,
             String action, HostedLayerActionParams actionParams, String message) { }
 }

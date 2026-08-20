@@ -1,5 +1,6 @@
 package com.epgis.sggis.mcp.scene;
 
+import com.epgis.sggis.mcp.model.ToolResultStatus;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -50,13 +51,13 @@ public class DeviceLocationService {
         EndpointCall searchCall = new EndpointCall("POST", SEARCH_ENDPOINT,
                 Map.of("keyword", requested, "keywordType", 4, "pageNum", 1, "pageSize", 20));
         if (matches.isEmpty()) {
-            return new DeviceLocationResult("NOT_FOUND", null, null, List.of(), List.of(searchCall),
-                    "没有找到匹配设备，请提供更准确的设备名称、OID或设备ID。");
+            return new DeviceLocationResult(ToolResultStatus.NOT_FOUND, null, null, List.of(),
+                    List.of(searchCall), ToolResultStatus.NOT_FOUND.msg());
         }
         if (matches.size() > 1) {
-            return new DeviceLocationResult("NEED_CONFIRMATION", null, null,
+            return new DeviceLocationResult(ToolResultStatus.NEED_CONFIRMATION, null, null,
                     matches.stream().map(EquipmentCandidate::from).toList(), List.of(searchCall),
-                    "匹配到多个设备，请让用户确认后使用设备OID再次调用。");
+                    ToolResultStatus.NEED_CONFIRMATION.msg());
         }
         Equipment selected = matches.getFirst();
         EndpointCall detailCall = new EndpointCall("GET",
@@ -66,8 +67,8 @@ public class DeviceLocationService {
         LocateActionParams actionParams = new LocateActionParams(
                 EquipmentCandidate.from(selected), selected.voltageLevel(), selected.geometry(),
                 "POINT".equals(selected.geometryKind()) ? "substation" : "power-line", true);
-        return new DeviceLocationResult("COMPLETED", ACTION, actionParams, List.of(),
-                List.of(searchCall, detailCall), "已定位设备“" + selected.name() + "”。");
+        return new DeviceLocationResult(ToolResultStatus.COMPLETED, ACTION, actionParams, List.of(),
+                List.of(searchCall, detailCall), ToolResultStatus.COMPLETED.msg());
     }
 
     private static Equipment equipment(String oid, String typeId, String deviceId, String name,
@@ -93,6 +94,6 @@ public class DeviceLocationService {
     public record EndpointCall(String method, String endpoint, Map<String, Object> parameters) { }
     public record LocateActionParams(EquipmentCandidate equipment, String voltageLevel,
             GeoJsonGeometry geometry, String icon, boolean highlight) { }
-    public record DeviceLocationResult(String status, String action, LocateActionParams actionParams,
+    public record DeviceLocationResult(ToolResultStatus status, String action, LocateActionParams actionParams,
             List<EquipmentCandidate> candidates, List<EndpointCall> endpointCalls, String message) { }
 }

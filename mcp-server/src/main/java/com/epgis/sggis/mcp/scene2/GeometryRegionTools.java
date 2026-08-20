@@ -1,5 +1,6 @@
 package com.epgis.sggis.mcp.scene2;
 
+import com.epgis.sggis.mcp.model.ToolResultStatus;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -42,8 +43,10 @@ public class GeometryRegionTools {
                         || item.iscId().equalsIgnoreCase(requested))
                 .map(item -> new OrganizationInfo(item.iscId(), item.name()))
                 .toList();
-        return new OrganizationCatalogResult(ORGANIZATION_CATALOG_ENDPOINT, Map.of("keyword", requested),
-                organizations, organizations.size() == 1
+        ToolResultStatus status = candidateStatus(organizations.size());
+        return new OrganizationCatalogResult(status,
+                ORGANIZATION_CATALOG_ENDPOINT, Map.of("keyword", requested),
+                organizations, status.msg(), organizations.size() == 1
                         ? "使用iscId调用queryOrganizationBoundaryForRegion。"
                         : "没有唯一组织机构时，请先补充或确认组织。");
     }
@@ -61,9 +64,9 @@ public class GeometryRegionTools {
                 .orElseThrow(() -> new IllegalArgumentException("iscId未匹配到组织机构，请先查询组织目录"));
         RegionActionParams params = new RegionActionParams("ORGANIZATION_BOUNDARY", selected.name(),
                 selected.boundary(), 0, "#2F80ED", "rgba(47,128,237,0.25)");
-        return new OrganizationBoundaryResult(ORGANIZATION_BOUNDARY_ENDPOINT,
+        return new OrganizationBoundaryResult(ToolResultStatus.COMPLETED, ORGANIZATION_BOUNDARY_ENDPOINT,
                 Map.of("iscIds", List.of(selected.iscId()), "cstype", "lonlat", "isDilution", false),
-                selected.boundary(), "DRAW_REGION", params, "已查询组织机构边界。");
+                selected.boundary(), "DRAW_REGION", params, ToolResultStatus.COMPLETED.msg());
     }
 
     @Tool(description = """
@@ -79,9 +82,10 @@ public class GeometryRegionTools {
                         || item.oid().equalsIgnoreCase(requested))
                 .map(item -> new EquipmentInfo(item.oid(), item.typeId(), item.name()))
                 .toList();
-        return new EquipmentSearchResult(EQUIPMENT_SEARCH_ENDPOINT,
+        ToolResultStatus status = candidateStatus(candidates.size());
+        return new EquipmentSearchResult(status, EQUIPMENT_SEARCH_ENDPOINT,
                 Map.of("keyword", requested, "keywordType", 4, "pageNum", 1, "pageSize", 20),
-                candidates, candidates.size() == 1
+                candidates, status.msg(), candidates.size() == 1
                         ? "使用typeId和oid调用queryEquipmentDetailForBuffer。"
                         : "没有唯一设备时，请先补充或确认设备。");
     }
@@ -101,9 +105,10 @@ public class GeometryRegionTools {
                 .orElseThrow(() -> new IllegalArgumentException("typeId和psrId未匹配到设备，请先搜索设备"));
         String endpoint = EQUIPMENT_DETAIL_ENDPOINT.replace("{typeid}", selected.typeId())
                 .replace("{psrid}", selected.oid());
-        return new EquipmentGeometryResult(endpoint,
+        return new EquipmentGeometryResult(ToolResultStatus.READY_FOR_NEXT_STEP, endpoint,
                 Map.of("cstype", "lonlat", "isGeojsonFormat", true),
                 new EquipmentInfo(selected.oid(), selected.typeId(), selected.name()), selected.geometry(),
+                ToolResultStatus.READY_FOR_NEXT_STEP.msg(),
                 "把geometry和用户给出的米数传给analyzeGeometryBufferForRegion。");
     }
 
@@ -124,9 +129,17 @@ public class GeometryRegionTools {
         GeoJsonGeometry buffered = createBoundingBuffer(geometry, distanceMeters);
         RegionActionParams params = new RegionActionParams("EQUIPMENT_BUFFER", "设备缓冲区", buffered,
                 distanceMeters, "#F2994A", "rgba(242,153,74,0.25)");
-        return new BufferAnalysisResult(BUFFER_ENDPOINT,
+        return new BufferAnalysisResult(ToolResultStatus.COMPLETED, BUFFER_ENDPOINT,
                 Map.of("geometry", List.of(geometry), "distance", distanceMeters), buffered,
-                "DRAW_REGION", params, "已生成设备缓冲区。");
+                "DRAW_REGION", params, ToolResultStatus.COMPLETED.msg());
+    }
+
+    private static ToolResultStatus candidateStatus(int candidateCount) {
+        return switch (candidateCount) {
+            case 0 -> ToolResultStatus.NOT_FOUND;
+            case 1 -> ToolResultStatus.READY_FOR_NEXT_STEP;
+            default -> ToolResultStatus.NEED_CONFIRMATION;
+        };
     }
 
     private static GeoJsonGeometry createBoundingBuffer(GeoJsonGeometry geometry, double distanceMeters) {
@@ -180,17 +193,19 @@ public class GeometryRegionTools {
 
     public record GeoJsonGeometry(String type, Object coordinates) { }
     public record OrganizationInfo(String iscId, String name) { }
-    public record OrganizationCatalogResult(String endpoint, Map<String, Object> request,
-            List<OrganizationInfo> organizations, String nextAction) { }
+    public record OrganizationCatalogResult(ToolResultStatus status, String endpoint,
+            Map<String, Object> request,
+            List<OrganizationInfo> organizations, String message, String nextAction) { }
     public record RegionActionParams(String mode, String name, GeoJsonGeometry geometry,
             double bufferDistanceMeters, String strokeColor, String fillColor) { }
-    public record OrganizationBoundaryResult(String endpoint, Map<String, Object> request,
+    public record OrganizationBoundaryResult(ToolResultStatus status, String endpoint,
+            Map<String, Object> request,
             GeoJsonGeometry boundary, String action, RegionActionParams actionParams, String message) { }
     public record EquipmentInfo(String oid, String typeId, String name) { }
-    public record EquipmentSearchResult(String endpoint, Map<String, Object> request,
-            List<EquipmentInfo> candidates, String nextAction) { }
-    public record EquipmentGeometryResult(String endpoint, Map<String, Object> request,
-            EquipmentInfo equipment, GeoJsonGeometry geometry, String nextAction) { }
-    public record BufferAnalysisResult(String endpoint, Map<String, Object> request,
+    public record EquipmentSearchResult(ToolResultStatus status, String endpoint, Map<String, Object> request,
+            List<EquipmentInfo> candidates, String message, String nextAction) { }
+    public record EquipmentGeometryResult(ToolResultStatus status, String endpoint, Map<String, Object> request,
+            EquipmentInfo equipment, GeoJsonGeometry geometry, String message, String nextAction) { }
+    public record BufferAnalysisResult(ToolResultStatus status, String endpoint, Map<String, Object> request,
             GeoJsonGeometry geometry, String action, RegionActionParams actionParams, String message) { }
 }

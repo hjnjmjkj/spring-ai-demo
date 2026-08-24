@@ -84,6 +84,7 @@ button { cursor: pointer; }
 
 .secondary-button { background: #fff; color: var(--ink); white-space: nowrap; }
 .secondary-button:hover { border-color: var(--accent); color: var(--accent); }
+.navigation-button { display: inline-flex; align-items: center; text-decoration: none; }
 
 .toolbar {
     display: flex;

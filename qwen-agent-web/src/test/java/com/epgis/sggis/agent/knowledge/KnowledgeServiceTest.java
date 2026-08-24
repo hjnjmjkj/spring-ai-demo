@@ -15,13 +15,15 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.jdbc.core.JdbcTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 class KnowledgeServiceTest {
 
     @Test
     void addsDocumentWithMetadataAndTimestamp() {
         VectorStore vectorStore = mock(VectorStore.class);
-        KnowledgeService service = new KnowledgeService(vectorStore);
+        KnowledgeService service = service(vectorStore);
 
         KnowledgeDocument saved = service.add("Spring AI 支持 RAG", Map.of("source", "manual"));
 
@@ -41,7 +43,7 @@ class KnowledgeServiceTest {
         when(vectorStore.similaritySearch(org.mockito.ArgumentMatchers.any(SearchRequest.class)))
                 .thenReturn(List.of(match));
 
-        List<KnowledgeDocument> results = new KnowledgeService(vectorStore).search("问题", 3, 0.7);
+        List<KnowledgeDocument> results = service(vectorStore).search("问题", 3, 0.7);
 
         assertThat(results).singleElement().satisfies(result -> {
             assertThat(result.id()).isEqualTo("doc-1");
@@ -55,9 +57,18 @@ class KnowledgeServiceTest {
         VectorStore vectorStore = mock(VectorStore.class);
         doThrow(new IllegalStateException("database secret")).when(vectorStore).add(anyList());
 
-        assertThatThrownBy(() -> new KnowledgeService(vectorStore).add("内容", Map.of()))
+        assertThatThrownBy(() -> service(vectorStore).add("内容", Map.of()))
                 .isInstanceOf(KnowledgeServiceException.class)
                 .hasMessageNotContaining("database secret")
                 .hasMessageContaining("知识入库失败");
+    }
+
+    private KnowledgeService service(VectorStore vectorStore) {
+        return new KnowledgeService(
+                vectorStore,
+                mock(JdbcTemplate.class),
+                new ObjectMapper(),
+                "public",
+                "vector_store");
     }
 }

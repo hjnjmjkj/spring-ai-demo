@@ -227,9 +227,6 @@ elements.knowledgeButton.addEventListener('click', () => {
 function closeKnowledgeDialog() { elements.knowledgeDialog.close(); }
 elements.closeKnowledge.addEventListener('click', closeKnowledgeDialog);
 elements.cancelKnowledge.addEventListener('click', closeKnowledgeDialog);
-elements.knowledgeDialog.addEventListener('click', event => {
-    if (event.target === elements.knowledgeDialog) closeKnowledgeDialog();
-});
 elements.knowledgeForm.addEventListener('submit', async event => {
     event.preventDefault();
     const content = elements.knowledgeContent.value.trim();

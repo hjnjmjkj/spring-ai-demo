@@ -1,6 +1,10 @@
 server:
   port: 8080
 
+agent:
+  skills:
+    directory: ${AGENT_SKILLS_DIRECTORY:skills}
+
 spring:
   application:
     name: qwen-agent-web

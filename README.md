@@ -35,6 +35,7 @@ mvn -version
 | `QWEN_EMBEDDING_MODEL` | 否 | `text-embedding-v4` | 知识入库和检索使用的向量模型 |
 | `QWEN_EMBEDDING_DIMENSIONS` | 否 | `1024` | 向量维数；修改后需清空或迁移旧表 |
 | `MCP_SERVER_URL` | 否 | `http://localhost:8081` | MCP Server 基础地址 |
+| `AGENT_SKILLS_DIRECTORY` | 否 | `skills` | Agent Skills 根目录（相对于应用工作目录） |
 | `PGVECTOR_HOST` | 否 | `localhost` | PostgreSQL 主机 |
 | `PGVECTOR_PORT` | 否 | `5555` | PostgreSQL 宿主机端口 |
 | `POSTGRES_DB` | 否 | `pgvector` | 数据库名 |
@@ -72,6 +73,27 @@ mvn -pl qwen-agent-web spring-boot:run
 ```
 
 浏览器访问 [http://localhost:8080](http://localhost:8080)。点击“添加知识”粘贴资料，保存后即可直接针对该资料提问；计算类问题仍会调用 MCP 的 `calculate` 工具。
+
+## Agent Skills
+
+Agent Skills 位于 `skills/<skill-name>/SKILL.md`。每个文件必须使用 UTF-8 编码，并以 YAML front matter 开头；目录名与 `name` 必须一致，且仅可使用小写字母、数字和连字符：
+
+```markdown
+---
+name: electrical-gis-analysis
+description: 分析电网 GIS 数据、设备空间关系或地理区域时使用。
+---
+
+# 电网 GIS 分析
+
+这里写入技能的完整操作指令。
+```
+
+每次对话都会重新扫描技能目录。模型先看到技能的名称和描述；任务匹配时会调用 `loadSkill` 读取对应的完整 `SKILL.md`，因此无需重启服务即可添加、修改或删除技能。无效的 front matter、目录名不匹配和符号链接会被忽略；`loadSkill` 只能读取当前发现的技能，不能读取目录外文件。可通过 `AGENT_SKILLS_DIRECTORY` 指定其他技能根目录。
+
+每个 Skill 目录还可包含 `references/`、`examples/` 和 `templates/` 等辅助文本。`loadSkillResource(skillName, path)` 可按需读取已发现 Skill 目录内的 `.md`、`.txt`、`.json`、`.yaml` 或 `.yml` 文件，单文件最大 100 KB。该工具拒绝符号链接、路径遍历、目录外路径和其他文件类型；脚本不会自动执行。
+
+项目内置了 `mathematical-calculation`、`equipment-location`、`hosted-layer-viewing`、`geometry-region-drawing`、`construction-project-browsing` 和 `electrical-gis-analysis` 六项业务技能。核心系统提示词仅定义身份、知识库优先和地图结果安全约束；各业务工具的调用参数及流程由对应 Skill 管理。
 
 ## MCP 工具和地图场景
 

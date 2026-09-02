@@ -1,6 +1,7 @@
 package com.epgis.sggis.agent.chat;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.springframework.ai.chat.client.ChatClient;
@@ -11,6 +12,10 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.stereotype.Component;
+import com.epgis.sggis.agent.config.AgentSystemPrompt;
+import com.epgis.sggis.agent.skills.SkillCatalog;
+import com.epgis.sggis.agent.skills.SkillResourceToolCallback;
+import com.epgis.sggis.agent.skills.SkillToolCallback;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -22,21 +27,28 @@ final class SpringAiAgentClient implements AgentClient {
     private final ChatClient chatClient;
     private final ToolCallbackProvider mcpTools;
     private final ObjectMapper objectMapper;
+    private final SkillCatalog skillCatalog;
 
-    SpringAiAgentClient(ChatClient chatClient, ToolCallbackProvider mcpTools, ObjectMapper objectMapper) {
+    SpringAiAgentClient(
+            ChatClient chatClient,
+            ToolCallbackProvider mcpTools,
+            ObjectMapper objectMapper,
+            SkillCatalog skillCatalog) {
         this.chatClient = chatClient;
         this.mcpTools = mcpTools;
         this.objectMapper = objectMapper;
+        this.skillCatalog = skillCatalog;
     }
 
     @Override
     public AgentReply call(String conversationId, String message) {
         List<McpToolResult> toolResults = new ArrayList<>();
-        ToolCallbackProvider recordingTools = recordingTools(toolResults);
+        ToolCallbackProvider callbackProvider = tools(toolResults);
         String content = chatClient.prompt()
+                .system(AgentSystemPrompt.BASE + "\n" + skillCatalog.prompt())
                 .user(message)
                 .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, conversationId))
-                .tools(recordingTools)
+                .tools(callbackProvider)
                 .call()
                 .content();
         return new AgentReply(content, toolResults);
@@ -60,6 +72,16 @@ final class SpringAiAgentClient implements AgentClient {
             wrapped[index] = new RecordingToolCallback(callbacks[index], results);
         }
         return ToolCallbackProvider.from(wrapped);
+    }
+
+    private ToolCallbackProvider tools(List<McpToolResult> results) {
+        ToolCallback[] mcpCallbacks = recordingTools(results).getToolCallbacks();
+        ToolCallback[] callbacks = Arrays.copyOf(mcpCallbacks, mcpCallbacks.length + 2);
+        callbacks[mcpCallbacks.length] = new RecordingToolCallback(
+                new SkillToolCallback(skillCatalog, objectMapper), results);
+        callbacks[mcpCallbacks.length + 1] = new RecordingToolCallback(
+                new SkillResourceToolCallback(skillCatalog, objectMapper), results);
+        return ToolCallbackProvider.from(callbacks);
     }
 
     private Object json(String value) {

@@ -12,7 +12,7 @@ spring:
         name: sggis-mcp-server
         version: 1.0.0
         type: SYNC
-        instructions: "提供精确计算、设备定位、托管图层查看、几何区域绘制和基建工程浏览工具。多候选结果必须先由用户确认；地图场景工具返回的 action 和 actionParams 交由前端渲染。"
+        instructions: "提供精确计算、设备定位、托管图层查看、几何区域绘制、基建工程浏览，以及已处理 SHP 和 GIM 文件展示工具。多候选结果必须先由用户确认；地图和文件展示工具返回的 action 和 actionParams 交由前端渲染。"
         capabilities:
           tool: true
           resource: false

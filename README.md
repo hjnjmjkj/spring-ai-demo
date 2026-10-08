@@ -93,19 +93,21 @@ description: 分析电网 GIS 数据、设备空间关系或地理区域时使�
 
 每个 Skill 目录还可包含 `references/`、`examples/` 和 `templates/` 等辅助文本。`loadSkillResource(skillName, path)` 可按需读取已发现 Skill 目录内的 `.md`、`.txt`、`.json`、`.yaml` 或 `.yml` 文件，单文件最大 100 KB。该工具拒绝符号链接、路径遍历、目录外路径和其他文件类型；脚本不会自动执行。
 
-项目内置了 `mathematical-calculation`、`equipment-location`、`hosted-layer-viewing`、`geometry-region-drawing`、`construction-project-browsing` 和 `electrical-gis-analysis` 六项业务技能。核心系统提示词仅定义身份、知识库优先和地图结果安全约束；各业务工具的调用参数及流程由对应 Skill 管理。
+项目内置了 `mathematical-calculation`、`equipment-location`、`hosted-layer-viewing`、`geometry-region-drawing`、`construction-project-browsing`、`electrical-gis-analysis` 和 `uploaded-file-display` 七项业务技能。核心系统提示词仅定义身份、知识库优先和地图结果安全约束；各业务工具的调用参数及流程由对应 Skill 管理。
 
 ## MCP 工具和地图场景
 
-MCP Server 当前提供五个聚合工具：
+MCP Server 当前提供七个聚合工具：
 
 1. `calculate`：执行精确的两数四则运算。
 2. `locateEquipment`：按设备名称、OID 或设备ID查询并返回 `LOCATE_EQUIPMENT` 地图动作。
 3. `viewHostedLayer`：按应用名称和图层名称查询并返回 `LOAD_HOSTED_LAYER` 地图动作。
 4. `drawGeometryRegion`：查询组织边界或生成设备缓冲区，返回 `DRAW_REGION` 地图动作。
 5. `browseConstructionProject`：查询基建工程及模型服务，返回 `SHOW_CONSTRUCTION_PROJECT` 地图动作。
+6. `showShapeData`：返回 `SHOW_SHP_LAYER` 指令，供页面加载已上传并发布的 SHP 数据。
+7. `previewGimModel`：返回 `SHOW_GLB_MODEL` 指令，供页面预览已转换为 GLB 的 GIM 模型。
 
-地图工具统一返回 `status`、`action`、`actionParams`、`candidates` 和 `message`。`status` 为
+地图和文件展示工具统一返回 `status`、`action`、`actionParams`、`candidates` 和 `message`。`status` 为
 `NEED_CONFIRMATION` 时，Agent 必须先让用户从 `candidates` 中确认目标；只有 `COMPLETED` 结果才应交给前端执行地图动作。
 
 可以在网页中尝试：
@@ -116,9 +118,13 @@ MCP Server 当前提供五个聚合工具：
 绘制厦门市供电公司的管理范围
 绘制中闽线周边500米缓冲区
 查看厦门同安输变电工程
+我补充了该系统的鸟害区的分布数据，请将解析结果给我展示
+我上传了广州西门子能源变压器有限公司换流变压器设备的GIM模型，请给我展示模型预览效果
 ```
 
 以上数据和业务接口调用记录均为演示数据，不代表真实电网和工程数据。
+
+`showShapeData` 和 `previewGimModel` 仅返回页面展示指令。本示例不提供文件上传、SHP ZIP 解压发布或 GIM 到 GLB 转换；生产接入时应由业务系统完成这些处理，再将实际资源地址加入 `actionParams`。
 
 停止数据库：
 
@@ -266,7 +272,9 @@ function handleToolResult(tool) {
     LOCATE_EQUIPMENT: locateEquipment,
     LOAD_HOSTED_LAYER: loadHostedLayer,
     DRAW_REGION: drawRegion,
-    SHOW_CONSTRUCTION_PROJECT: showConstructionProject
+      SHOW_CONSTRUCTION_PROJECT: showConstructionProject,
+      SHOW_SHP_LAYER: showShpLayer,
+      SHOW_GLB_MODEL: showGlbModel
   }[result.action];
 
   if (handler) {

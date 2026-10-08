@@ -67,6 +67,8 @@ function renderToolResult(bubble, toolResult) {
     const messageBody = bubble.closest('.message-body');
     if (!messageBody) return;
 
+    renderFileDisplayCommand(messageBody, toolResult.result);
+
     let container = messageBody.querySelector('.tool-results');
     if (!container) {
         container = document.createElement('div');
@@ -87,6 +89,33 @@ function renderToolResult(bubble, toolResult) {
         details.appendChild(toolResultSection('执行结果', toolResult.result));
     }
     container.appendChild(details);
+}
+
+function renderFileDisplayCommand(messageBody, result) {
+    if (!result || result.status !== 'COMPLETED' || !result.actionParams) return;
+    const command = {
+        SHOW_SHP_LAYER: {
+            title: 'SHP 图层展示',
+            description: '页面已收到图层加载指令。',
+            type: 'SHP'
+        },
+        SHOW_GLB_MODEL: {
+            title: 'GLB 模型预览',
+            description: '页面已收到模型预览指令。',
+            type: 'GLB'
+        }
+    }[result.action];
+    if (!command) return;
+
+    const card = document.createElement('section');
+    card.className = 'file-display-command';
+    const title = document.createElement('strong');
+    title.textContent = command.title;
+    const text = document.createElement('p');
+    const name = result.actionParams.resourceName || '未命名资源';
+    text.textContent = `${command.description} 资源：${name}（${result.actionParams.resourceType || command.type}）`;
+    card.append(title, text);
+    messageBody.insertBefore(card, messageBody.querySelector('.bubble'));
 }
 
 function toolResultSection(title, value) {

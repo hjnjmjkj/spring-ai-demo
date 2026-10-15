@@ -21,6 +21,7 @@ const elements = {
 
 let conversationId = loadConversationId();
 let activeController = null;
+let conversationMessages = loadConversationMessages();
 
 function loadConversationId() {
     const stored = localStorage.getItem('qwenConversationId');
@@ -39,6 +40,33 @@ function createConversationId() {
     return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10).join('')}`;
 }
 
+function conversationMessagesKey() {
+    return `qwenConversationMessages:${conversationId}`;
+}
+
+function loadConversationMessages() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(conversationMessagesKey()) || '[]');
+        if (!Array.isArray(stored)) return [];
+        return stored.filter(message =>
+            message &&
+            (message.role === 'user' || message.role === 'assistant') &&
+            typeof message.content === 'string'
+        ).map(message => ({
+            role: message.role,
+            content: message.content,
+            isError: Boolean(message.isError),
+            toolResults: Array.isArray(message.toolResults) ? message.toolResults : []
+        }));
+    } catch (_) {
+        return [];
+    }
+}
+
+function saveConversationMessages() {
+    localStorage.setItem(conversationMessagesKey(), JSON.stringify(conversationMessages));
+}
+
 function setStatus(type, text) {
     elements.status.className = `status ${type}`;
     elements.status.innerHTML = `<span></span>${escapeHtml(text)}`;
@@ -51,18 +79,35 @@ function setBusy(busy) {
     setStatus(busy ? 'working' : 'idle', busy ? '正在思考…' : '准备就绪');
 }
 
-function addMessage(role, content = '', isError = false) {
+function renderMessage(message) {
     const article = document.createElement('article');
-    article.className = `message ${role}${isError ? ' error' : ''}`;
-    article.innerHTML = `<div class="avatar">${role === 'user' ? '你' : 'AI'}</div><div class="message-body"><div class="bubble"></div></div>`;
+    article.className = `message ${message.role}${message.isError ? ' error' : ''}`;
+    article.innerHTML = `<div class="avatar">${message.role === 'user' ? '你' : 'AI'}</div><div class="message-body"><div class="bubble"></div></div>`;
     const bubble = article.querySelector('.bubble');
-    bubble.textContent = content;
+    bubble.textContent = message.content;
+    bubble.conversationMessage = message;
     elements.messages.appendChild(article);
+    message.toolResults.forEach(toolResult => renderToolResult(bubble, toolResult, false));
     scrollToBottom();
     return bubble;
 }
 
-function renderToolResult(bubble, toolResult) {
+function addMessage(role, content = '', isError = false) {
+    const message = { role, content, isError, toolResults: [] };
+    conversationMessages.push(message);
+    const bubble = renderMessage(message);
+    saveConversationMessages();
+    return bubble;
+}
+
+function saveMessageContent(bubble) {
+    const message = bubble.conversationMessage;
+    if (!message) return;
+    message.content = bubble.textContent;
+    saveConversationMessages();
+}
+
+function renderToolResult(bubble, toolResult, persist = true) {
     if (!toolResult || typeof toolResult !== 'object') return;
     const messageBody = bubble.closest('.message-body');
     if (!messageBody) return;
@@ -87,6 +132,10 @@ function renderToolResult(bubble, toolResult) {
         details.appendChild(toolResultSection('执行结果', toolResult.result));
     }
     container.appendChild(details);
+    if (persist && bubble.conversationMessage) {
+        bubble.conversationMessage.toolResults.push(toolResult);
+        saveConversationMessages();
+    }
 }
 
 function toolResultSection(title, value) {
@@ -127,6 +176,7 @@ async function sendSync(payload, bubble) {
     const body = await response.json();
     bubble.textContent = body.content || '模型没有返回内容。';
     (body.toolResults || []).forEach(result => renderToolResult(bubble, result));
+    saveMessageContent(bubble);
 }
 
 async function sendStream(payload, bubble) {
@@ -154,6 +204,7 @@ async function sendStream(payload, bubble) {
     }
     bubble.classList.remove('typing');
     if (!bubble.textContent) bubble.textContent = '模型没有返回内容。';
+    saveMessageContent(bubble);
 }
 
 function processEvent(frame, bubble) {
@@ -170,6 +221,7 @@ function processEvent(frame, bubble) {
     const content = typeof data === 'object' && data !== null ? data.content ?? '' : data;
     if (eventName === 'token') {
         bubble.textContent += content;
+        saveMessageContent(bubble);
         scrollToBottom();
     } else if (eventName === 'tool') {
         renderToolResult(bubble, data);
@@ -200,8 +252,10 @@ elements.form.addEventListener('submit', async event => {
         } else {
             bubble.textContent = `出错了：${error.message}`;
             bubble.closest('.message').classList.add('error');
+            bubble.conversationMessage.isError = true;
             setStatus('error', '请求失败');
         }
+        saveMessageContent(bubble);
     } finally {
         activeController = null;
         setBusy(false);
@@ -215,6 +269,7 @@ elements.newChat.addEventListener('click', () => {
     conversationId = createConversationId();
     localStorage.setItem('qwenConversationId', conversationId);
     elements.messages.innerHTML = '';
+    conversationMessages = [];
     addMessage('assistant', '新会话已经开始。有什么可以帮你？');
     setStatus('idle', '准备就绪');
 });
@@ -267,4 +322,14 @@ function resizeInput() {
     elements.input.style.height = `${Math.min(elements.input.scrollHeight, 160)}px`;
     elements.count.textContent = `${elements.input.value.length} / 4000`;
 }
+function initializeConversation() {
+    elements.messages.innerHTML = '';
+    if (conversationMessages.length) {
+        conversationMessages.forEach(renderMessage);
+    } else {
+        addMessage('assistant', '你好！我支持知识库问答、精确计算，以及设备定位、托管图层、区域绘制和基建工程浏览。');
+    }
+}
+
+initializeConversation();
 elements.input.focus();
